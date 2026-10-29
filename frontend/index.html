@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C-Inspect — Real-Time, History-Aware Static Analysis for C</title>
+    <meta name="description" content="A real-time, history-aware static analysis tool and educational compiler design coding environment for C programming students.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Monaco Editor Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+</head>
+<body>
+    <div id="app" class="app-container">
+        <!-- Top Navigation Bar -->
+        <header class="top-nav">
+            <div class="brand-group">
+                <div class="logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                        <line x1="14" y1="4" x2="10" y2="20" stroke-opacity="0.6"></line>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">C-Inspect <span class="badge-v1">v1.0</span></div>
+                    <div class="brand-sub">Real-Time History-Aware Static Analysis • Compiler Design</div>
+                </div>
+            </div>
+
+            <!-- Student Profile Selector (FR-11 Profile Isolation) -->
+            <div class="profile-section">
+                <label for="student-select" class="profile-label">Student:</label>
+                <div class="profile-dropdown-wrapper">
+                    <select id="student-select" class="glass-select">
+                        <option value="student_demo">Alex Chen (CS101)</option>
+                        <option value="student_maya">Maya Patel (CS101)</option>
+                    </select>
+                </div>
+                <button id="btn-new-student" class="btn-icon" title="Create New Student Profile">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+
+            <!-- Top Action Controls -->
+            <div class="nav-actions">
+                <div id="compiler-status-indicator" class="compiler-status-pill" title="Compiler status">
+                    <span class="status-dot"></span>
+                    <span id="compiler-name-label">Detecting Compiler...</span>
+                </div>
+
+                <button id="btn-download-report" class="btn btn-secondary" title="Download simple summary report of mistakes and compiler output">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Download Report</span>
+                </button>
+
+                <button id="btn-save-checkpoint" class="btn btn-secondary" title="Save Checkpoint & Record Submission to History Database">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    <span>Submit & Track</span>
+                </button>
+
+                <button id="btn-run-code" class="btn btn-primary" title="Invoke GCC/Clang or safe educational executor">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>Run (GCC)</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Work Area -->
+        <main class="main-content">
+            <!-- Left Panel: Editor & Output Console -->
+            <section class="left-workspace">
+                <!-- Editor Header Bar -->
+                <div class="editor-header">
+                    <div class="file-tab active">
+                        <span class="c-file-icon">C</span>
+                        <span id="current-filename">main.c</span>
+                    </div>
+
+                    <!-- Sample Test Cases Loader Dropdown -->
+                    <div class="sample-loader-wrapper">
+                        <label for="sample-select" class="sample-label">Load Sample:</label>
+                        <select id="sample-select" class="glass-select sample-select" title="Quick-load official C-Inspect test cases">
+                            <option value="">-- Choose Sample Program --</option>
+                        </select>
+                    </div>
+
+                    <div class="editor-status-bar">
+                        <div id="debounce-indicator" class="debounce-indicator">
+                            <span class="pulse-dot"></span>
+                            <span id="debounce-text">Live Static Analysis Active</span>
+                        </div>
+                        <div id="diagnostics-counter" class="diag-counter-pill">
+                            <span class="count-item errors" id="count-errors">0 Errors</span>
+                            <span class="count-divider">•</span>
+                            <span class="count-item warnings" id="count-warnings">0 Warnings</span>
+                            <span class="count-divider">•</span>
+                            <span class="count-item infos" id="count-infos">0 Info</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Monaco Editor Mount Container -->
+                <div class="editor-container">
+                    <div id="monaco-editor"></div>
+                    <textarea id="fallback-editor" class="fallback-editor" spellcheck="false" style="display:none;"></textarea>
+                </div>
+
+                <!-- Bottom Terminal / Output Drawer -->
+                <div class="terminal-drawer">
+                    <div class="terminal-header">
+                        <div class="terminal-tabs">
+                            <button class="term-tab active" data-tab="compiler">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                                <span>Compiler Output</span>
+                            </button>
+                            <button class="term-tab" data-tab="tokens">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                                <span>Lexer Token Stream</span>
+                            </button>
+                        </div>
+                        <div class="terminal-tools">
+                            <button id="btn-clear-term" class="btn-tool" title="Clear terminal">Clear</button>
+                        </div>
+                    </div>
+                    <div class="terminal-body">
+                        <!-- Compiler Tab -->
+                        <div id="tab-compiler" class="term-pane active">
+                            <div class="stdin-bar">
+                                <label for="stdin-input" class="stdin-label">Program Stdin:</label>
+                                <input type="text" id="stdin-input" class="glass-input stdin-input" placeholder="Type optional standard input for scanf() here...">
+                            </div>
+                            <div id="terminal-content" class="terminal-pre">Ready. Press [Run (GCC)] to invoke external compiler or [Submit & Track] to checkpoint findings.</div>
+                        </div>
+                        <!-- Token Stream Tab -->
+                        <div id="tab-tokens" class="term-pane">
+                            <div id="tokens-stream-container" class="tokens-grid">
+                                <div class="placeholder-msg">Type C code to see live token stream generated by Lexical Analysis...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Multi-tab Educational Inspector -->
+            <aside class="right-inspector">
+                <!-- Inspector Tabs Navigation -->
+                <div class="inspector-tabs">
+                    <button class="insp-tab active" data-view="diagnostics">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span>Diagnostics</span>
+                        <span id="badge-diag-count" class="tab-badge">0</span>
+                    </button>
+                    <button class="insp-tab" data-view="history">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <span>Learning History</span>
+                    </button>
+                    <button class="insp-tab" data-view="compiler-stages">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                        <span>Compiler Stages</span>
+                    </button>
+                    <button class="insp-tab" data-view="rules">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        <span>Rule Catalog</span>
+                    </button>
+                </div>
+
+                <!-- Inspector Views -->
+                <div class="inspector-content">
+                    <!-- VIEW 1: Diagnostics List -->
+                    <div id="view-diagnostics" class="insp-view active">
+                        <div class="diagnostics-toolbar">
+                            <div class="filter-pills">
+                                <button class="filter-pill active" data-filter="all">All</button>
+                                <button class="filter-pill" data-filter="error">Errors</button>
+                                <button class="filter-pill" data-filter="warning">Warnings</button>
+                                <button class="filter-pill" data-filter="info">Info</button>
+                            </div>
+                            <div class="checkpoint-prompt">
+                                <span class="tip-dot"></span>
+                                <span>Checkpoints survive restart</span>
+                            </div>
+                        </div>
+
+                        <!-- Findings Cards Container -->
+                        <div id="diagnostics-list" class="diagnostics-list">
+                            <!-- Populated dynamically -->
+                            <div class="empty-state">
+                                <div class="empty-icon">✓</div>
+                                <div class="empty-title">Clean Source Code</div>
+                                <div class="empty-desc">No static analysis issues detected in supported rules.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 2: Student Learning History & Recurrence Analytics -->
+                    <div id="view-history" class="insp-view">
+                        <div class="history-header-card">
+                            <div class="student-meta">
+                                <div class="student-avatar" id="history-avatar">AC</div>
+                                <div>
+                                    <h3 id="history-student-name">Alex Chen (CS101)</h3>
+                                    <div class="history-sub" id="history-sub-stats">Loading persistent history...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="history-section-title">Recurring Mistake Hotspots</div>
+                        <div id="history-rule-bars" class="history-rule-bars">
+                            <!-- Recurrence bars populated dynamically -->
+                        </div>
+
+                        <div class="history-section-title">Submission Checkpoints (SQLite Persisted)</div>
+                        <div id="history-submissions-list" class="submissions-timeline">
+                            <!-- Submissions populated dynamically -->
+                        </div>
+
+                        <div class="history-section-title">Individual Findings & Status Management (FR-08)</div>
+                        <div id="history-findings-list" class="history-findings-list">
+                            <!-- Findings with Mark Corrected / Dismiss buttons populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- VIEW 3: Compiler Design Inspector (Milestones B & Course Demo) -->
+                    <div id="view-compiler-stages" class="insp-view">
+                        <div class="compiler-stages-intro">
+                            <div class="stage-tag">Compiler Design Live Pipeline</div>
+                            <p>Live visualization of the internal representation across compilation stages for the current source file.</p>
+                        </div>
+
+                        <!-- Stage Accordion 1: Lexical Analysis -->
+                        <div class="stage-card">
+                            <div class="stage-card-header">
+                                <div class="stage-num">1</div>
+                                <div class="stage-info">
+                                    <div class="stage-name">Lexical Analysis (Scanner)</div>
+                                    <div class="stage-desc">Converts raw C character stream into structured Tokens</div>
+                                </div>
+                            </div>
+                            <div class="stage-card-body">
+                                <div id="stage-lexer-summary" class="stage-summary-box">Tokens generated: 0</div>
+                            </div>
+                        </div>
+
+                        <!-- Stage Accordion 2: Syntax Analysis (AST) -->
+                        <div class="stage-card">
+                            <div class="stage-card-header">
+                                <div class="stage-num">2</div>
+                                <div class="stage-info">
+                                    <div class="stage-name">Syntax Analysis (AST Generation)</div>
+                                    <div class="stage-desc">Recursive-descent parse tree representing statements & expressions</div>
+                                </div>
+                            </div>
+                            <div class="stage-card-body">
+                                <div id="ast-tree-viewer" class="tree-viewer-box">
+                                    <div class="placeholder-msg">Type code to inspect the live Abstract Syntax Tree...</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stage Accordion 3: Symbol Table & Scopes -->
+                        <div class="stage-card">
+                            <div class="stage-card-header">
+                                <div class="stage-num">3</div>
+                                <div class="stage-info">
+                                    <div class="stage-name">Scoped Symbol Table</div>
+                                    <div class="stage-desc">Tracks identifier bindings, types, scopes, and reference counts</div>
+                                </div>
+                            </div>
+                            <div class="stage-card-body">
+                                <div id="symbol-table-viewer" class="tree-viewer-box">
+                                    <div class="placeholder-msg">Loading Scoped Symbol Table...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 4: Rule Catalog -->
+                    <div id="view-rules" class="insp-view">
+                        <div class="catalog-intro">
+                            <h3>Supported C-Inspect Static Rules</h3>
+                            <p>Small, reliable, pedagogical rule set demonstrating syntax checks, symbol resolution, and suspicious patterns.</p>
+                        </div>
+                        <div id="rule-catalog-cards" class="catalog-cards-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Modal: Create New Student Profile -->
+    <div id="modal-new-student" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>New Student Profile</h3>
+                <button id="btn-close-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Add a new student profile to demonstrate profile isolation (FR-11). Each student's recurring mistake history remains completely separate.</p>
+                <div class="form-group">
+                    <label for="new-student-name">Student Display Name:</label>
+                    <input type="text" id="new-student-name" class="glass-input" placeholder="e.g. Jordan Smith (CS101)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-student" class="btn btn-secondary">Cancel</button>
+                <button id="btn-create-student-confirm" class="btn btn-primary">Create Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Compilation & Inspection Report Popup -->
+    <div id="modal-report-popup" class="modal-overlay">
+        <div class="modal-card report-modal-card">
+            <div class="modal-header">
+                <div>
+                    <h3 id="report-modal-title">Inspection & Compilation Report</h3>
+                    <div class="modal-sub">Review static analysis findings and compiler output below.</div>
+                </div>
+                <button id="btn-close-report-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body report-modal-body">
+                <!-- Summary KPI Chips -->
+                <div class="report-stats-grid">
+                    <div class="stat-box error-box">
+                        <span class="stat-num" id="pop-stat-errors">0</span>
+                        <span class="stat-lbl">Errors</span>
+                    </div>
+                    <div class="stat-box warning-box">
+                        <span class="stat-num" id="pop-stat-warnings">0</span>
+                        <span class="stat-lbl">Warnings</span>
+                    </div>
+                    <div class="stat-box repeat-box">
+                        <span class="stat-num" id="pop-stat-repeat">0</span>
+                        <span class="stat-lbl">Repetitive</span>
+                    </div>
+                    <div class="stat-box new-box">
+                        <span class="stat-num" id="pop-stat-new">0</span>
+                        <span class="stat-lbl">New Issues</span>
+                    </div>
+                </div>
+
+                <div class="report-preview-wrapper">
+                    <div class="report-preview-header">
+                        <span>Report Content</span>
+                        <span class="report-tag-auto">Ready to Download</span>
+                    </div>
+                    <pre id="report-preview-text" class="report-preview-pre"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-close-report-popup" class="btn btn-secondary">Close</button>
+                <button id="btn-modal-download-report" class="btn btn-primary">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    <span>Download Report (.txt)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
